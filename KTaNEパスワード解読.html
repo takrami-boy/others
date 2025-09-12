@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>パスワード解読ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        .card {
+            background-color: #2d3748;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+            padding: 2rem;
+            width: 100%;
+            max-width: 500px;
+        }
+        .dial-container {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .dial {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Adjusting the height to accommodate 6 characters */
+            height: 10rem;
+            width: 3.5rem;
+        }
+        .dial input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            font-size: 1.5rem;
+            text-align: center;
+            text-transform: uppercase;
+            background-color: transparent;
+            border: 2px solid #a0aec0;
+            border-radius: 0.5rem;
+            color: transparent;
+            caret-color: #cbd5e0;
+        }
+        .dial .vertical-display {
+            position: absolute;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+        }
+        .dial .vertical-display span {
+            /* Adjusting font size for better vertical fit */
+            font-size: 1rem;
+            color: #cbd5e0;
+        }
+        #results {
+            background-color: #4a5568;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            min-height: 150px;
+            overflow-y: auto;
+            max-height: 300px;
+        }
+        #results ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 0.5rem;
+        }
+        #results li {
+            text-align: center;
+            font-size: 1rem;
+            padding: 0.25rem;
+            background-color: #2d3748;
+            border-radius: 0.25rem;
+        }
+        #results li.highlight {
+            background-color: #48bb78;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="card">
+            <h1 class="text-3xl font-bold text-center mb-4">パスワード解読ツール</h1>
+            <p class="text-center text-sm mb-6 text-gray-400">各ダイヤルに表示されている文字を入力してください。候補が自動で絞り込まれます。</p>
+            <div class="dial-container">
+                <div class="dial">
+                    <input type="text" id="dial1" maxlength="6" class="focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                    <div class="vertical-display"></div>
+                </div>
+                <div class="dial">
+                    <input type="text" id="dial2" maxlength="6" class="focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                    <div class="vertical-display"></div>
+                </div>
+                <div class="dial">
+                    <input type="text" id="dial3" maxlength="6" class="focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                    <div class="vertical-display"></div>
+                </div>
+                <div class="dial">
+                    <input type="text" id="dial4" maxlength="6" class="focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                    <div class="vertical-display"></div>
+                </div>
+                <div class="dial">
+                    <input type="text" id="dial5" maxlength="6" class="focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200">
+                    <div class="vertical-display"></div>
+                </div>
+            </div>
+
+            <div id="results" class="mt-4">
+                <p class="text-center text-gray-400" id="message">パスワード候補が表示されます。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const passwords = [
+            "about", "after", "again", "below", "could", "every", "first", "found", "great", "house",
+            "large", "learn", "never", "other", "place", "plant", "point", "right", "small", "sound",
+            "spell", "still", "study", "their", "there", "these", "thing", "think", "three", "water",
+            "where", "which", "world", "would", "write"
+        ];
+
+        const dials = document.querySelectorAll('.dial input');
+        const resultsDiv = document.getElementById('results');
+        const messageEl = document.getElementById('message');
+
+        function filterPasswords() {
+            let filteredList = [...passwords];
+            
+            dials.forEach((dial, index) => {
+                const inputChars = dial.value.toLowerCase().trim();
+                if (inputChars.length > 0) {
+                    filteredList = filteredList.filter(word => {
+                        return inputChars.includes(word[index]);
+                    });
+                }
+            });
+
+            displayResults(filteredList);
+        }
+
+        function displayResults(list) {
+            resultsDiv.innerHTML = '';
+            if (list.length === 0) {
+                resultsDiv.innerHTML = '<p class="text-center text-gray-400">候補が見つかりませんでした。</p>';
+            } else {
+                const ul = document.createElement('ul');
+                list.forEach(word => {
+                    const li = document.createElement('li');
+                    li.textContent = word;
+                    if (list.length === 1) {
+                        li.classList.add('highlight');
+                    }
+                    ul.appendChild(li);
+                });
+                resultsDiv.appendChild(ul);
+            }
+        }
+
+        dials.forEach(dial => {
+            const verticalDisplay = dial.nextElementSibling;
+
+            dial.addEventListener('input', () => {
+                // Clear and recreate vertical characters
+                verticalDisplay.innerHTML = '';
+                const value = dial.value;
+                for (const char of value) {
+                    const charSpan = document.createElement('span');
+                    charSpan.textContent = char;
+                    verticalDisplay.appendChild(charSpan);
+                }
+                
+                filterPasswords();
+            });
+        });
+
+        // Initial display
+        filterPasswords();
+    </script>
+</body>
+</html>
