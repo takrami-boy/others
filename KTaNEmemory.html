@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KTANE メモリモジュール ソルバー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 600px;
+        }
+        .module-card {
+            background-color: #2a2a2a;
+            border: 2px solid #555;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .button-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div class="container mx-auto p-4 rounded-lg module-card">
+        <h1 class="text-3xl font-bold text-center mb-6">KTANE メモリモジュール ソルバー</h1>
+        
+        <!-- ステージ表示 -->
+        <p id="stageInfo" class="text-sm text-gray-400 mb-4 text-center">ステージ: 1</p>
+
+        <!-- ディスプレイ入力セクション -->
+        <div class="mb-6" id="display-input-section">
+            <label for="displayNumber" class="block text-lg font-medium text-gray-400 mb-2">ディスプレイに表示された数字</label>
+            <input type="number" id="displayNumber" min="1" max="4" class="w-full p-3 rounded-lg bg-gray-700 text-white text-xl text-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200" placeholder="1〜4">
+        </div>
+
+        <!-- 応答入力セクション -->
+        <div class="mb-6 hidden" id="response-input-section">
+            <label for="responseInput" class="block text-lg font-medium text-gray-400 mb-2" id="response-label"></label>
+            <input type="number" id="responseInput" min="1" max="4" class="w-full p-3 rounded-lg bg-gray-700 text-white text-xl text-center focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200" placeholder="">
+        </div>
+        
+        <!-- 数字入力ボタン -->
+        <div class="grid grid-cols-4 gap-4 mb-6">
+            <button onclick="handleButtonClick(1)" class="w-full h-16 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center relative">
+                <span class="button-label">1</span>
+            </button>
+            <button onclick="handleButtonClick(2)" class="w-full h-16 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center relative">
+                <span class="button-label">2</span>
+            </button>
+            <button onclick="handleButtonClick(3)" class="w-full h-16 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center relative">
+                <span class="button-label">3</span>
+            </button>
+            <button onclick="handleButtonClick(4)" class="w-full h-16 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 transform hover:scale-105 active:scale-95 shadow-lg flex items-center justify-center relative">
+                <span class="button-label">4</span>
+            </button>
+        </div>
+        
+        <!-- 結果表示とリセット -->
+        <div class="bg-gray-800 p-4 rounded-lg mb-6 text-center">
+            <p id="instruction" class="text-xl font-bold text-green-400">「ディスプレイの数字」を入力し、Enterを押してください</p>
+        </div>
+        
+        <div class="flex justify-center">
+            <button onclick="resetModule()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 shadow-md">リセット</button>
+        </div>
+    </div>
+    
+    <!-- 履歴表示 -->
+    <div class="container mx-auto mt-6 p-4 rounded-lg module-card">
+        <h2 class="text-xl font-bold mb-2">履歴</h2>
+        <div id="history-list" class="bg-gray-800 p-3 rounded-lg text-sm"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 記憶モジュールの状態を保持する配列
+            let stage = 1;
+            let history = []; // 各ステージの記録を保存
+            let nextInstruction = null;
+            
+            // DOM要素
+            const displayNumberInput = document.getElementById('displayNumber');
+            const displayInputSection = document.getElementById('display-input-section');
+            const responseInputSection = document.getElementById('response-input-section');
+            const responseInput = document.getElementById('responseInput');
+            const responseLabel = document.getElementById('response-label');
+            const instructionText = document.getElementById('instruction');
+            const stageInfoText = document.getElementById('stageInfo');
+            const historyList = document.getElementById('history-list');
+
+            // ツールを初期化する
+            function resetModule() {
+                stage = 1;
+                history = [];
+                displayNumberInput.value = '';
+                responseInput.value = '';
+                if (instructionText) {
+                    instructionText.innerText = '「ディスプレイの数字」を入力し、Enterを押してください';
+                    instructionText.className = 'text-xl font-bold text-green-400';
+                }
+                if (stageInfoText) {
+                    stageInfoText.innerText = `ステージ: ${stage}`;
+                }
+                updateHistoryDisplay();
+                if (displayInputSection) {
+                    displayInputSection.classList.remove('hidden');
+                }
+                if (responseInputSection) {
+                    responseInputSection.classList.add('hidden');
+                }
+                if (displayNumberInput) {
+                    displayNumberInput.focus();
+                }
+            }
+
+            // 履歴を更新する
+            function updateHistoryDisplay() {
+                if (historyList) {
+                    historyList.innerHTML = '';
+                    history.forEach((h, index) => {
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'mb-2 p-2 rounded bg-gray-700';
+                        let text = `ステージ ${index + 1}:`;
+                        text += ` ディスプレイは「${h.displayed}」`;
+                        text += ` / 指示: 「${h.instruction.action === 'position' ? '位置' : 'ラベル'}が${h.instruction.value}のボタン」`;
+                        text += ` / 押したボタン: 「位置${h.pressedPosition}」 (ラベル: ${h.pressedLabel})`;
+                        historyItem.innerText = text;
+                        historyList.appendChild(historyItem);
+                    });
+                }
+            }
+
+            // メモリモジュールのルールを実装
+            function getRuleInstruction() {
+                if (stage > 5) return null;
+
+                switch (stage) {
+                    case 1:
+                        const disp1 = history[0].displayed;
+                        if (disp1 === 1) return { action: 'position', value: 2 };
+                        if (disp1 === 2) return { action: 'position', value: 2 };
+                        if (disp1 === 3) return { action: 'position', value: 3 };
+                        if (disp1 === 4) return { action: 'position', value: 4 };
+                        break;
+                    case 2:
+                        const disp2 = history[1].displayed;
+                        if (disp2 === 1) return { action: 'label', value: 4 };
+                        if (disp2 === 2) return { action: 'position', value: history[0].pressedPosition };
+                        if (disp2 === 3) return { action: 'position', value: 1 };
+                        if (disp2 === 4) return { action: 'position', value: history[0].pressedPosition };
+                        break;
+                    case 3:
+                        const disp3 = history[2].displayed;
+                        if (disp3 === 1) return { action: 'label', value: history[1].pressedLabel };
+                        if (disp3 === 2) return { action: 'label', value: history[0].pressedLabel };
+                        if (disp3 === 3) return { action: 'position', value: 3 };
+                        if (disp3 === 4) return { action: 'label', value: 4 };
+                        break;
+                    case 4:
+                        const disp4 = history[3].displayed;
+                        if (disp4 === 1) return { action: 'position', value: history[0].pressedPosition };
+                        if (disp4 === 2) return { action: 'position', value: 1 };
+                        if (disp4 === 3) return { action: 'position', value: history[1].pressedPosition };
+                        if (disp4 === 4) return { action: 'position', value: history[1].pressedPosition };
+                        break;
+                    case 5:
+                        const disp5 = history[4].displayed;
+                        if (disp5 === 1) return { action: 'label', value: history[0].pressedLabel };
+                        if (disp5 === 2) return { action: 'label', value: history[1].pressedLabel };
+                        if (disp5 === 3) return { action: 'label', value: history[3].pressedLabel };
+                        if (disp5 === 4) return { action: 'label', value: history[2].pressedLabel };
+                        break;
+                }
+                return null;
+            }
+
+            // 入力欄に値を設定し、Enterキーの動作をシミュレート
+            function setInputValueAndTrigger(inputElement, value) {
+                if (inputElement) {
+                    inputElement.value = value;
+                    const event = new KeyboardEvent('keypress', {
+                        'key': 'Enter'
+                    });
+                    inputElement.dispatchEvent(event);
+                }
+            }
+
+            // 数字ボタンが押されたときの処理
+            window.handleButtonClick = (value) => {
+                // 現在アクティブな入力欄に応じて値を設定
+                if (!displayInputSection.classList.contains('hidden')) {
+                    setInputValueAndTrigger(displayNumberInput, value);
+                } else if (!responseInputSection.classList.contains('hidden')) {
+                    setInputValueAndTrigger(responseInput, value);
+                }
+            };
+            
+            window.resetModule = resetModule;
+
+            // ディスプレイの数字が入力された後の処理
+            displayNumberInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const displayedNumber = parseInt(displayNumberInput.value, 10);
+                    if (displayedNumber >= 1 && displayedNumber <= 4) {
+                        // // ボタンのラベルをランダムに設定する（ゲームの状況をシミュレート）
+                        // const labels = [1, 2, 3, 4].sort(() => Math.random() - 0.5);
+                        // document.querySelector('div.grid.grid-cols-4.gap-4 button:nth-child(1) span').innerText = labels[0];
+                        // document.querySelector('div.grid.grid-cols-4.gap-4 button:nth-child(2) span').innerText = labels[1];
+                        // document.querySelector('div.grid.grid-cols-4.gap-4 button:nth-child(3) span').innerText = labels[2];
+                        // document.querySelector('div.grid.grid-cols-4.gap-4 button:nth-child(4) span').innerText = labels[3];
+                        
+                        history.push({
+                            stage: stage,
+                            displayed: displayedNumber,
+                            pressedPosition: null,
+                            pressedLabel: null,
+                            // labels: labels
+                        });
+                        
+                        nextInstruction = getRuleInstruction();
+                        if (nextInstruction) {
+                            history[stage - 1].instruction = nextInstruction;
+                            if (nextInstruction.action === 'position') {
+                                if (instructionText) instructionText.innerText = `次に「位置が${nextInstruction.value}のボタン」を押してください。押したボタンのラベルを入力してください。`;
+                                if (responseLabel) responseLabel.innerText = '押したボタンのラベル';
+                                if (responseInput) responseInput.placeholder = 'ラベルの数字 (1〜4)';
+                            } else {
+                                if (instructionText) instructionText.innerText = `次に「ラベルが${nextInstruction.value}のボタン」を押してください。押したボタンの位置を入力してください。`;
+                                if (responseLabel) responseLabel.innerText = '押したボタンの位置';
+                                if (responseInput) responseInput.placeholder = '位置の数字 (1〜4)';
+                            }
+                        }
+
+                        if (displayInputSection) displayInputSection.classList.add('hidden');
+                        if (responseInputSection) responseInputSection.classList.remove('hidden');
+                        if (responseInput) responseInput.focus();
+                    } else {
+                        if (instructionText) {
+                            instructionText.innerText = '無効な入力です。1〜4を入力してください';
+                            instructionText.className = 'text-xl font-bold text-red-400';
+                        }
+                    }
+                }
+            });
+
+            // 応答入力が完了したときの処理
+            responseInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const inputValue = parseInt(responseInput.value, 10);
+                    if (inputValue >= 1 && inputValue <= 4) {
+                        let pressedPosition, pressedLabel;
+                        if (nextInstruction.action === 'position') {
+                            pressedPosition = nextInstruction.value;
+                            pressedLabel = inputValue;
+                        } else { // nextInstruction.action === 'label'
+                            pressedPosition = inputValue;
+                            pressedLabel = nextInstruction.value;
+                        }
+
+                        // 履歴を更新
+                        history[stage - 1].pressedPosition = pressedPosition;
+                        history[stage - 1].pressedLabel = pressedLabel;
+
+                        // 次のステージに進む
+                        stage++;
+                        if (stageInfoText) stageInfoText.innerText = `ステージ: ${stage}`;
+                        if (displayNumberInput) displayNumberInput.value = '';
+                        if (responseInput) responseInput.value = '';
+                        updateHistoryDisplay();
+
+                        if (stage > 5) {
+                            if (instructionText) {
+                                instructionText.innerText = 'モジュールを解除しました！おめでとうございます！';
+                                instructionText.className = 'text-xl font-bold text-blue-400';
+                            }
+                            if (displayInputSection) displayInputSection.classList.remove('hidden');
+                            if (responseInputSection) responseInputSection.classList.add('hidden');
+                        } else {
+                            if (instructionText) {
+                                instructionText.innerText = '「ディスプレイの数字」を入力し、Enterを押してください';
+                                instructionText.className = 'text-xl font-bold text-green-400';
+                            }
+                            if (displayInputSection) displayInputSection.classList.remove('hidden');
+                            if (responseInputSection) responseInputSection.classList.add('hidden');
+                        }
+                        if (displayNumberInput) displayNumberInput.focus();
+                    } else {
+                        if (instructionText) {
+                            instructionText.innerText = '無効な入力です。1〜4を入力してください';
+                            instructionText.className = 'text-xl font-bold text-red-400';
+                        }
+                    }
+                }
+            });
+            
+            // 初期化
+            resetModule();
+        });
+    </script>
+</body>
+</html>

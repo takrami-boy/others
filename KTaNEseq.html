@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>順番ワイヤ 解除ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-red { background-color: #ef4444; color: white; }
+        .btn-red:hover:not(:disabled) { background-color: #dc2626; }
+        .btn-blue { background-color: #3b82f6; color: white; }
+        .btn-blue:hover:not(:disabled) { background-color: #2563eb; }
+        .btn-black { background-color: #1f2937; color: white; }
+        .btn-black:hover:not(:disabled) { background-color: #111827; }
+        .result-panel {
+            min-height: 100px;
+            transition: all 0.3s ease-in-out;
+        }
+        .result-cut {
+            background-color: #10b981; /* a shade of green */
+            color: white;
+            transform: scale(1.05);
+        }
+        .result-nocut {
+            background-color: #ef4444; /* a shade of red */
+            color: white;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto bg-gray-900 rounded-2xl shadow-2xl p-6 md:p-8 space-y-6">
+        
+        <!-- ヘッダー -->
+        <div class="text-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-100">順番ワイヤ 解除ツール</h1>
+            <p class="text-gray-400 mt-1">Sequence Wires Solver</p>
+        </div>
+
+        <!-- カウント表示 -->
+        <div class="grid grid-cols-3 gap-4 text-center bg-gray-800 p-4 rounded-lg">
+            <div>
+                <p class="text-sm font-bold text-red-400">赤 (RED)</p>
+                <p id="red-count" class="text-2xl font-bold">0</p>
+            </div>
+            <div>
+                <p class="text-sm font-bold text-blue-400">青 (BLUE)</p>
+                <p id="blue-count" class="text-2xl font-bold">0</p>
+            </div>
+            <div>
+                <p class="text-sm font-bold text-gray-400">黒 (BLACK)</p>
+                <p id="black-count" class="text-2xl font-bold">0</p>
+            </div>
+        </div>
+        
+        <!-- 操作パネル -->
+        <div class="space-y-4">
+            <!-- 1. 色の選択 -->
+            <div>
+                <p id="step-guide" class="text-center text-lg text-cyan-400 mb-3">1. ワイヤの色を選択</p>
+                <div id="color-selector" class="grid grid-cols-3 gap-3">
+                    <button id="btn-red" data-color="red" class="btn btn-red font-bold py-3 rounded-lg text-lg">赤</button>
+                    <button id="btn-blue" data-color="blue" class="btn btn-blue font-bold py-3 rounded-lg text-lg">青</button>
+                    <button id="btn-black" data-color="black" class="btn btn-black font-bold py-3 rounded-lg text-lg">黒</button>
+                </div>
+            </div>
+
+            <!-- 2. アルファベットの選択 -->
+            <div>
+                 <div id="letter-selector" class="grid grid-cols-3 gap-3">
+                    <button id="btn-a" data-letter="A" class="btn bg-gray-600 hover:bg-gray-500 font-bold py-3 rounded-lg text-lg" disabled>A</button>
+                    <button id="btn-b" data-letter="B" class="btn bg-gray-600 hover:bg-gray-500 font-bold py-3 rounded-lg text-lg" disabled>B</button>
+                    <button id="btn-c" data-letter="C" class="btn bg-gray-600 hover:bg-gray-500 font-bold py-3 rounded-lg text-lg" disabled>C</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 結果表示 -->
+        <div id="result-panel" class="result-panel flex items-center justify-center bg-gray-700 rounded-lg text-center">
+            <p id="result-text" class="text-3xl font-bold"></p>
+        </div>
+        
+        <!-- リセットボタン -->
+        <button id="btn-reset" class="w-full btn bg-gray-500 hover:bg-gray-400 text-gray-900 font-bold py-3 rounded-lg text-lg">リセット (RESET)</button>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 各種要素の取得
+            const counts = {
+                red: document.getElementById('red-count'),
+                blue: document.getElementById('blue-count'),
+                black: document.getElementById('black-count'),
+            };
+            const colorButtons = document.querySelectorAll('#color-selector button');
+            const letterButtons = document.querySelectorAll('#letter-selector button');
+            const resetButton = document.getElementById('btn-reset');
+            const resultPanel = document.getElementById('result-panel');
+            const resultText = document.getElementById('result-text');
+            const stepGuide = document.getElementById('step-guide');
+
+            // ワイヤのカウント
+            let wireCounts = { red: 0, blue: 0, black: 0 };
+            
+            // 現在選択中の色
+            let selectedColor = null;
+
+            // 解除ルール
+            const rules = {
+                red: [
+                    ['C'], ['B'], ['A'], ['A', 'C'], ['B'], ['A', 'C'], ['A', 'B', 'C'], ['A', 'B'], ['B']
+                ],
+                blue: [
+                    ['B'], ['A', 'C'], ['B'], ['A'], ['B'], ['B', 'C'], ['C'], ['A', 'C'], ['A']
+                ],
+                black: [
+                    ['A', 'B', 'C'], ['A', 'C'], ['B'], ['A', 'C'], ['B'], ['B', 'C'], ['A', 'B'], ['C'], ['C']
+                ]
+            };
+            
+            // 初期化関数
+            function initialize() {
+                wireCounts = { red: 0, blue: 0, black: 0 };
+                selectedColor = null;
+                updateCountDisplay();
+                resetUI();
+            }
+
+            // UIを初期状態または次の入力待ち状態に戻す
+            function resetUI() {
+                resultPanel.className = 'result-panel flex items-center justify-center bg-gray-700 rounded-lg text-center';
+                resultText.textContent = '';
+                stepGuide.textContent = '1. ワイヤの色を選択';
+                
+                colorButtons.forEach(btn => btn.disabled = false);
+                letterButtons.forEach(btn => btn.disabled = true);
+            }
+
+            // カウント表示を更新
+            function updateCountDisplay() {
+                counts.red.textContent = wireCounts.red;
+                counts.blue.textContent = wireCounts.blue;
+                counts.black.textContent = wireCounts.black;
+            }
+            
+            // 色ボタンのクリック処理
+            colorButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    selectedColor = button.dataset.color;
+                    
+                    // 色ボタンを無効化し、文字ボタンを有効化
+                    colorButtons.forEach(btn => btn.disabled = true);
+                    letterButtons.forEach(btn => btn.disabled = false);
+                    stepGuide.textContent = '2. 接続先の文字を選択';
+                });
+            });
+
+            // 文字ボタンのクリック処理
+            letterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    if (!selectedColor) return;
+
+                    const letter = button.dataset.letter;
+                    
+                    // カウントを増やす
+                    wireCounts[selectedColor]++;
+                    updateCountDisplay();
+
+                    const ruleSet = rules[selectedColor];
+                    const occurrence = wireCounts[selectedColor] - 1; // 0-indexed
+
+                    if (occurrence < ruleSet.length) {
+                        const correctLetters = ruleSet[occurrence];
+                        if (correctLetters.includes(letter)) {
+                            showResult(true); // 切る
+                        } else {
+                            showResult(false); // 切らない
+                        }
+                    } else {
+                        // ルールにない場合（9本以上）は切らない
+                        showResult(false);
+                    }
+                    
+                    // 次のステップへ
+                    stepGuide.textContent = '判定結果';
+                    letterButtons.forEach(btn => btn.disabled = true);
+                    setTimeout(resetUI, 1500); // 1.5秒後にUIをリセット
+                });
+            });
+            
+            // 結果表示関数
+            function showResult(shouldCut) {
+                if (shouldCut) {
+                    resultPanel.classList.add('result-cut');
+                    resultText.textContent = '✅ 切る (CUT)';
+                } else {
+                    resultPanel.classList.add('result-nocut');
+                    resultText.textContent = '❌ 切らない (DON\'T)';
+                }
+            }
+
+            // リセットボタンの処理
+            resetButton.addEventListener('click', initialize);
+
+            // 初期化実行
+            initialize();
+        });
+    </script>
+</body>
+</html>

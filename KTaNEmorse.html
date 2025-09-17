@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>モールス信号デコーダー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .container {
+            max-width: 640px;
+        }
+        .input-display {
+            min-height: 48px;
+        }
+        .word-list {
+            height: 300px;
+        }
+        .reset-button {
+            transition: all 0.2s;
+        }
+        .reset-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-4">
+
+<div class="container mx-auto p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+    <h1 class="text-3xl font-bold mb-4 text-center text-teal-400">モールス信号デコーダー</h1>
+    <p class="text-center text-gray-400 mb-6">モールス信号の長短をキーボードで入力してください。</p>
+
+    <!-- 入力表示エリア -->
+    <div class="bg-gray-700 p-4 rounded-lg mb-6 shadow-inner input-display flex items-center justify-center">
+        <div id="input-display" class="text-3xl font-mono text-yellow-400 select-all tracking-wider"></div>
+    </div>
+
+    <!-- キー操作の説明 -->
+    <div class="flex justify-center mb-6 space-x-4">
+        <div class="text-center">
+            <div class="bg-gray-600 text-gray-200 px-4 py-2 rounded-lg font-bold">.</div>
+            <span class="text-sm text-gray-400 mt-2 block">短点 (・)</span>
+        </div>
+        <div class="text-center">
+            <div class="bg-gray-600 text-gray-200 px-4 py-2 rounded-lg font-bold">-</div>
+            <span class="text-sm text-gray-400 mt-2 block">長点 (ー)</span>
+        </div>
+        <div class="text-center">
+            <div class="bg-gray-600 text-gray-200 px-4 py-2 rounded-lg font-bold">Space</div>
+            <span class="text-sm text-gray-400 mt-2 block">単語区切り</span>
+        </div>
+    </div>
+    
+    <div class="text-center text-gray-400 mb-6">
+        <button id="reset-button" class="reset-button bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50">
+            リセット (Esc)
+        </button>
+    </div>
+
+    <!-- 候補リスト -->
+    <div class="bg-gray-700 p-4 rounded-lg shadow-inner">
+        <h2 class="text-xl font-semibold mb-2 text-white">候補単語 (<span id="count">0</span>)</h2>
+        <ul id="word-list" class="word-list overflow-y-auto space-y-2 text-gray-300"></ul>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // ゲーム内のモールス信号対応表。必要に応じて修正してください。
+        // 英単語ごとにモールス信号をスペースで区切って記述します。
+        const morseWords = {
+            'shell': '··· ···· · ·−·· ·−··',
+            'halls': '···· ·− ·−·· ·−·· ···',
+            'slick': '··· ·−·· ·· −·−· −·−',
+            'trick': '− ·−· ·· −·−· −·−',
+            'boxes': '−··· −−− −··− · ···',
+            'leaks': '·−·· · ·− −·− ···',
+            'strobe': '··· − ·−· −−− −··· ·',
+            'bistro': '−··· ·· ··· − ·−· −−−',
+            'flick': '··−· ·−·· ·· −·−· −·−',
+            'bombs': '−··· −−− −− −··· ···',
+            'break': '−··· ·−· · ·− −·−',
+            'brick': '−··· ·−· ·· −·−· −·−',
+            'steak': '··· − · ·− −·−',
+            'sting': '··· − ·· −· −−·',
+            'vector': '···− · −·−· − −−− ·−·',
+            'beats': '−··· · ·− − ···',
+        };
+
+        const wordListEl = document.getElementById('word-list');
+        const inputDisplayEl = document.getElementById('input-display');
+        const countEl = document.getElementById('count');
+        const resetButton = document.getElementById('reset-button');
+        let currentInput = '';
+
+        // 全候補を表示する関数
+        function renderAllWords() {
+            const words = Object.keys(morseWords).sort();
+            wordListEl.innerHTML = words.map(word => `<li class="hover:text-teal-400 transition-colors">${word}</li>`).join('');
+            countEl.textContent = words.length;
+        }
+
+        // 候補を絞り込んで表示する関数
+        function filterAndRenderWords() {
+            const trimmedInput = currentInput.trim();
+        
+            const regex = /^(?<last>.+) (?<first>.*)$/;
+            const match = trimmedInput.match(regex);
+
+            const filteredWords = Object.keys(morseWords).filter(word => {
+                const morseString = morseWords[word];
+                
+                if (match) {
+                    const { first, last } = match.groups;
+                    
+                    const normalizedFirst = first.replace(/ /g, '');
+                    const normalizedLast = last.replace(/ /g, '');
+                    const normalizedMorse = morseString.replace(/ /g, '');
+                    
+                    return normalizedMorse.startsWith(normalizedFirst) && normalizedMorse.endsWith(normalizedLast);
+                } else {
+                    // スペースが含まれない場合（部分一致）
+                    return morseString.replace(/ /g, '').includes(trimmedInput.replace(/ /g, ''));
+                }
+            }).sort();
+        
+            wordListEl.innerHTML = filteredWords.map(word => `<li class="hover:text-teal-400 transition-colors">${word}</li>`).join('');
+            countEl.textContent = filteredWords.length;
+        }
+
+        // 入力をリセットする関数
+        function resetInput() {
+            currentInput = '';
+            inputDisplayEl.textContent = '';
+            renderAllWords();
+        }
+
+        // キーボード入力イベント
+        document.addEventListener('keydown', (event) => {
+            if (event.key === '.' || event.key === 'Dead') { 
+                currentInput += '·';
+                inputDisplayEl.textContent = currentInput;
+                filterAndRenderWords();
+            } else if (event.key === '-') {
+                currentInput += '−';
+                inputDisplayEl.textContent = currentInput;
+                filterAndRenderWords();
+            } else if (event.key === ' ') {
+                // 既にスペースで終わっている場合は追加しない
+                if (currentInput.length > 0 && currentInput.slice(-1) !== ' ') {
+                    currentInput += ' ';
+                    inputDisplayEl.textContent = currentInput;
+                    filterAndRenderWords();
+                }
+            } else if (event.key === 'Backspace') {
+                // バックスペースキーで最後の文字を削除
+                currentInput = currentInput.slice(0, -1);
+                inputDisplayEl.textContent = currentInput;
+                filterAndRenderWords();
+            } else if (event.key === 'Escape') {
+                resetInput();
+            }
+        });
+
+        // リセットボタンのクリックイベント
+        resetButton.addEventListener('click', resetInput);
+        
+        // 初期描画
+        renderAllWords();
+    });
+</script>
+
+</body>
+</html>
